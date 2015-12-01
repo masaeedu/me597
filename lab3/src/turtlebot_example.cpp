@@ -17,10 +17,16 @@
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <math.h>
+#include <Eigen/Dense>
 
 ros::Publisher marker_pub;
 
 #define TAGID 0
+
+using namespace std;
+
+double ipsYaw, ipsX, ipsY;
 
 //Callback function for the Position topic (LIVE)
 
@@ -30,6 +36,10 @@ void pose_callback(const geometry_msgs::PoseWithCovarianceStamped & msg)
 	double X = msg.pose.pose.position.x; // Robot X psotition
 	double Y = msg.pose.pose.position.y; // Robot Y psotition
  	double Yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
+
+  ips_x = X;
+  ips_y = Y;
+  ips_yaw = Yaw;
 
 	std::cout << "X: " << X << ", Y: " << Y << ", Yaw: " << Yaw << std::endl ;
 }
@@ -102,6 +112,70 @@ void map_callback(const nav_msgs::OccupancyGrid& msg)
 }
 
 
+void stopRobot(){
+
+  geometry_msgs::Twist vel;
+  vel.linear.x = 0;
+  vel.linear.y = 0;
+  vel.angular.z = 0;
+  velocity_publisher.publish(vel);
+
+}
+
+vector<double> previousErrorYaw;
+int kp = 2;
+int ki = 0.5;
+int kd = 0.3;
+
+// PID Yaw (takes current yaw and positions, and uses goal position to determine error)
+double yawController(double currentYaw, double ipsX, double ipsY, double targetX, double targetY){
+
+  //opposite over adjacent distance is angle to destination
+  double targetYaw = (targetY - ipsY)/(targetX - ipsX);
+
+  //error feedback for yaw
+  double errorInYaw = targetYaw - currentYaw;
+  
+  //record new error
+  previousErrorYaw.push_back(errorInYaw);
+
+  //total error over time for integral
+  double totalErrorYaw = 0;
+
+  for(int i = 0; i < previousErrorYaw.size; i++){
+      totalErrorYaw += previousErrorYaw[i];
+  }
+
+  //change in error for derivative
+  double changeInErrorYaw = currentYaw - previousErrorYaw.back();
+
+  //new output yaw
+  double outputYaw = kp*errorInYaw + ki*totalErrorYaw + kd*changeInErrorYaw;
+  return outputYaw;
+
+}
+
+bool correctYaw(double currentYaw, double desiredYaw)
+
+    geometry_msgs::Twist vel;
+
+    if(abs(currentYaw - desiredYaw) < 0.05){
+      return true;
+    }
+     else{
+      vel.angular.z = 0.01;
+    }
+
+    velocity_publisher.publish(vel);
+
+}
+
+bool goForward(double speed){
+  geometry_msgs::Twist vel;
+  vel.angular.z = 0;
+}
+
+
 int main(int argc, char **argv)
 {
 	//Initialize the ROS framework
@@ -131,24 +205,59 @@ int main(int argc, char **argv)
     end_.y = -12.0;
     end_.z = 0.0;
 	
+    geometry_msgs::Point waypoint1, waypoint2, waypoint3;
+
+    waypoint1.x = 4;
+    waypoint1.y = 0;
+    waypoint1.z = 0;
+
+    waypoint2.x = 8;
+    waypoint2.y = -4;
+    waypoint2.z = 3.14;
+
+    waypoint3.x = 8;
+    waypoint3.y = 0; 
+    waypoint3.z = -1.57;
+
+    bool outsideXThreshold, outsideYThreshold, outsideYawThreshold = true;
 
     while (ros::ok())
     {
     	loop_rate.sleep(); //Maintain the loop rate
     	ros::spinOnce();   //Check for new messages
 
-	 //Draw Curves
-         drawCurve(1);
-         drawCurve(2);
-         drawCurve(4);
+      //draw curves
+      drawCurve(1);
+      drawCurve(2);
+      drawCurve(4);
+      drawLineSegment(5,start_,end_);
 
-         drawLineSegment(5,start_,end_);
-    
-    	//Main loop code goes here:
-    	vel.linear.x = 0.1; // set linear speed
-    	vel.angular.z = 0.3; // set angular speed
+      //here's my current pose
+      //run prm to get path to next waypoint
 
-    	velocity_publisher.publish(vel); // Publish the command velocity
+      //am I outside the error bounds of the waypoint coordinate (+/- 0.25m)
+      if(outsideXThreshold || outsideYThreshold){
+        //if not, move towards destination
+        vel.linear.x = 0.1;
+        //update angular velocity using PID controller
+        vel.angular.z = ipsYaw + yawController(ipsYaw,waypoint1.x,waypoint1.y,ipsX,ipsY);
+      }
+      else{
+        //if within error bounds, stop moving
+        vel.linear.x = 0;
+        vel.angular.z = 0;
+      }
+
+      //check if within error bound of x waypoint
+      if(abs(waypoint1.x - ipsX) < 0.25){
+        outsideXThreshold = false;
+      }
+      //check if within error bounds of y waypoint
+      if(abs(waypoint1.y - ipsY) < 0.25){
+        outsideYThreshold = false;
+      }
+
+      velocity_publisher.publish(vel);
     }
 
     return 0;
