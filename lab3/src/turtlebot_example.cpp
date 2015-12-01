@@ -30,6 +30,14 @@ double ipsYaw, ipsX, ipsY;
 
 //Callback function for the Position topic (LIVE)
 
+
+double constrainAngle(double x){
+    x = fmod(x,2*M_PI);
+    if (x < 0)
+        x += 2*M_PI;
+    return x;
+}
+/*
 void pose_callback(const geometry_msgs::PoseWithCovarianceStamped & msg)
 {
 	//This function is called when a new position message is received
@@ -37,11 +45,27 @@ void pose_callback(const geometry_msgs::PoseWithCovarianceStamped & msg)
 	double Y = msg.pose.pose.position.y; // Robot Y psotition
  	double Yaw = tf::getYaw(msg.pose.pose.orientation); // Robot Yaw
 
-  ips_x = X;
-  ips_y = Y;
-  ips_yaw = Yaw;
+  ipsX = X;
+  ipsY = Y;
+  ipsYaw = Yaw;
 
 	std::cout << "X: " << X << ", Y: " << Y << ", Yaw: " << Yaw << std::endl ;
+}
+*/
+
+
+void pose_callback(const gazebo_msgs::ModelStates& msg) 
+{
+	int i;
+	for(i = 0; i < msg.name.size(); i++) 
+	{
+	    	if(msg.name[i] == "mobile_base") break;
+	}
+	
+	ipsX = msg.pose[i].position.x;
+	ipsY = msg.pose[i].position.y;
+	ipsYaw = tf::getYaw(msg.pose[i].orientation);
+
 }
 
 //Example of drawing a curve
@@ -111,68 +135,44 @@ void map_callback(const nav_msgs::OccupancyGrid& msg)
     //you probably want to save the map into a form which is easy to work with
 }
 
-
-void stopRobot(){
-
-  geometry_msgs::Twist vel;
-  vel.linear.x = 0;
-  vel.linear.y = 0;
-  vel.angular.z = 0;
-  velocity_publisher.publish(vel);
-
-}
-
 vector<double> previousErrorYaw;
-int kp = 2;
-int ki = 0.5;
-int kd = 0.3;
+double kp = 0.5;
+double ki = 0;
+double kd = 0;
+
 
 // PID Yaw (takes current yaw and positions, and uses goal position to determine error)
-double yawController(double currentYaw, double ipsX, double ipsY, double targetX, double targetY){
+double yawController(double currentYaw, double targetX, double targetY, double ipsX, double ipsY){
 
   //opposite over adjacent distance is angle to destination
-  double targetYaw = (targetY - ipsY)/(targetX - ipsX);
+  double targetYaw = atan2((targetY - ipsY),(targetX - ipsX));
+
+  targetYaw = targetYaw;
+
+  cout << "targetYaw: " << targetYaw << endl;
 
   //error feedback for yaw
   double errorInYaw = targetYaw - currentYaw;
   
+  cout << "errorYaw: " << errorInYaw << endl;
+ 
+  //change in error for derivative
+  //double changeInErrorYaw = errorInYaw - previousErrorYaw.back();
+  double changeInErrorYaw = 0;
   //record new error
   previousErrorYaw.push_back(errorInYaw);
 
   //total error over time for integral
   double totalErrorYaw = 0;
 
-  for(int i = 0; i < previousErrorYaw.size; i++){
+  for(int i = 0; i < previousErrorYaw.size(); i++){
       totalErrorYaw += previousErrorYaw[i];
   }
-
-  //change in error for derivative
-  double changeInErrorYaw = currentYaw - previousErrorYaw.back();
 
   //new output yaw
   double outputYaw = kp*errorInYaw + ki*totalErrorYaw + kd*changeInErrorYaw;
   return outputYaw;
 
-}
-
-bool correctYaw(double currentYaw, double desiredYaw)
-
-    geometry_msgs::Twist vel;
-
-    if(abs(currentYaw - desiredYaw) < 0.05){
-      return true;
-    }
-     else{
-      vel.angular.z = 0.01;
-    }
-
-    velocity_publisher.publish(vel);
-
-}
-
-bool goForward(double speed){
-  geometry_msgs::Twist vel;
-  vel.angular.z = 0;
 }
 
 
@@ -184,7 +184,9 @@ int main(int argc, char **argv)
 
     //Subscribe to the desired topics and assign callbacks
     ros::Subscriber map_sub = n.subscribe("/map", 1, map_callback);
-    ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
+    //ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback);
+    
+    ros::Subscriber pose_sub = n.subscribe("/gazebo/model_states", 1, pose_callback);
 
     //Setup topics to Publish from this node
     ros::Publisher velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
@@ -207,8 +209,8 @@ int main(int argc, char **argv)
 	
     geometry_msgs::Point waypoint1, waypoint2, waypoint3;
 
-    waypoint1.x = 4;
-    waypoint1.y = 0;
+    waypoint1.x = 1;
+    waypoint1.y = 1;
     waypoint1.z = 0;
 
     waypoint2.x = 8;
@@ -219,7 +221,9 @@ int main(int argc, char **argv)
     waypoint3.y = 0; 
     waypoint3.z = -1.57;
 
-    bool outsideXThreshold, outsideYThreshold, outsideYawThreshold = true;
+    bool outsideXThreshold = true;
+    bool outsideYThreshold = true;
+    bool outsideYawThreshold = true;
 
     while (ros::ok())
     {
@@ -240,23 +244,25 @@ int main(int argc, char **argv)
         //if not, move towards destination
         vel.linear.x = 0.1;
         //update angular velocity using PID controller
-        vel.angular.z = ipsYaw + yawController(ipsYaw,waypoint1.x,waypoint1.y,ipsX,ipsY);
+        vel.angular.z = yawController(ipsYaw,waypoint1.x,waypoint1.y,ipsX,ipsY);
       }
       else{
         //if within error bounds, stop moving
         vel.linear.x = 0;
         vel.angular.z = 0;
       }
-
+     
       //check if within error bound of x waypoint
-      if(abs(waypoint1.x - ipsX) < 0.25){
+      if(abs(waypoint1.x - ipsX) < 0.15){
         outsideXThreshold = false;
       }
       //check if within error bounds of y waypoint
-      if(abs(waypoint1.y - ipsY) < 0.25){
+      if(abs(waypoint1.y - ipsY) < 0.15){
         outsideYThreshold = false;
       }
-
+      
+      cout << "ipsX: " << ipsX <<  " ipsY: " << ipsY << " ipsYaw: " << ipsYaw << endl;
+      cout << "Outside X: " << outsideXThreshold << " Outside Y: " << outsideYThreshold << endl;
       velocity_publisher.publish(vel);
     }
 
