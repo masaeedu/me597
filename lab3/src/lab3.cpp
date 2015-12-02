@@ -27,10 +27,10 @@ typedef tuple<double, double> coord;
 
 #define TAGID 0
 
-ros::Publisher marker_pub;
+ros::Publisher miles_pub;
+ros::Publisher edges_pub;
 Eigen::Vector3d IPS;
-int m = 100;
-Eigen::MatrixXd PRM_x_y(2,m);
+int m = 10;
 nav_msgs::OccupancyGrid og;
 
 //Callback function for the Position topic (LIVE)
@@ -58,46 +58,6 @@ void pose_callback_sim(const gazebo_msgs::ModelStates& msg)
     IPS << msg.pose[i].position.x ,msg.pose[i].position.y ,tf::getYaw(msg.pose[i].orientation);
     ROS_INFO("pose_callback X: %f Y: %f Yaw: %f", IPS[0], IPS[1], IPS[2]);
 }
-
-
-//Example of drawing a curve
-
-void drawCurve(int k) 
-{
-   // Curves are drawn as a series of stright lines
-   // Simply sample your curves into a series of points
-
-   double x = 0;
-   double y = 0;
-   double steps = 50;
-
-   visualization_msgs::Marker lines;
-   lines.header.frame_id = "/map";
-   lines.id = k; //each curve must have a unique id or you will overwrite an old ones
-   lines.type = visualization_msgs::Marker::LINE_STRIP;
-   lines.action = visualization_msgs::Marker::ADD;
-   lines.ns = "curves";
-   lines.scale.x = 0.1;
-   lines.color.r = 1.0;
-   lines.color.b = 0.2*k;
-   lines.color.a = 1.0;
-
-   //generate curve points
-   for(int i = 0; i < steps; i++) {
-       geometry_msgs::Point p;
-       p.x = x;
-       p.y = y;
-       p.z = 0; //not used
-       lines.points.push_back(p); 
-
-       //curve model
-       x = x+0.1;
-       y = sin(0.1*i*k);   
-   }
-
-   //publish new curve
-   marker_pub.publish(lines);
-}
     
 void drawPoint(int k, geometry_msgs::Point p) 
 {
@@ -113,6 +73,10 @@ void drawPoint(int k, geometry_msgs::Point p)
     points.scale.y = 0.2;
     points.color.b = 1.0f;
     points.color.a = 1.0;
+    
+    points.points.push_back(p);
+    
+    miles_pub.publish(points);
 }
 
 void drawLineSegment(int k, geometry_msgs::Point start_point, geometry_msgs::Point end_point)
@@ -125,14 +89,14 @@ void drawLineSegment(int k, geometry_msgs::Point start_point, geometry_msgs::Poi
    lines.ns = "lab3";
    lines.scale.x = 0.1;
    lines.color.r = 1.0;
-   lines.color.b = 0.2*k;
+   lines.color.b = 0.2;
    lines.color.a = 1.0;
 
    lines.points.push_back(start_point);
    lines.points.push_back(end_point);
 
    //publish new segment line
-   marker_pub.publish(lines);
+   edges_pub.publish(lines);
 }
 
 //Callback function for the map
@@ -158,7 +122,6 @@ void drawPrm(tuple<vector<coord>, map<int, map<int, double>>> prmResult) {
         p.x = x;
         p.y = y;
         drawPoint(pointId++, p);
-        //std::cin.get();
     }
 	
 	// Plot the edges
@@ -171,7 +134,7 @@ void drawPrm(tuple<vector<coord>, map<int, map<int, double>>> prmResult) {
         coord c1 = coords[idx1];
         map<int, double> connections = kv1.second;
 
-	std::cout << "num connections: " << connections.size() << std::endl;
+        std::cout << "num connections: " << connections.size() << std::endl;
         for(auto kv2: connections) {
             geometry_msgs::Point start_, end_;
 
@@ -202,7 +165,8 @@ int main(int argc, char **argv)
     auto pose_sub_live = n.subscribe("/indoor_pos", 1, pose_callback_live); //switch for live tests
     auto pose_sub_sim = n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
     auto velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
-    marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 20);
+    miles_pub = n.advertise<visualization_msgs::Marker>("milestones", 0);
+    edges_pub = n.advertise<visualization_msgs::Marker>("edges", 0);
     
     //Velocity control variable
     geometry_msgs::Twist vel;
@@ -228,7 +192,6 @@ int main(int argc, char **argv)
 		std::cout << "Attempt " << attempt << ": " << std::endl;
 		result = prm(m, 6, coord{IPS[0],IPS[1]}, waypoints, grid);
 		drawPrm(result);
-        std::cin.get();
         
 		for (auto wp: vector<int>{1, 2, 3}) {
 			success = success && a_star(0, wp, std::get<0>(result), std::get<1>(result)).size() > 0;
