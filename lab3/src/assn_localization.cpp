@@ -248,13 +248,13 @@ int main(int argc, char **argv)
         belief.col(i) << (drand() - 0.5) * 2 * 10, (drand() - 0.5) * 2 * 10, (drand() - 0.5) * 2 * M_PI;
     }
     
-    // Publisher for belief particle set (queue size 0, don't really need msgs to queue up)
-    auto particles_pub = n.advertise<Marker>("visualization_marker", 1, true);    
+    // Publisher for belief particle set
+    auto particles_pub = n.advertise<Marker>("belief_set", 1, true);    
     
-    // Subscribers for odometry and IPS updates
-    auto odo_sub = n.subscribe("/odom", 1, odom_callback);
+    // Subscribers for odometry
+    n.subscribe("/odom", 1, odom_callback);
 	
-	// Subscribe handlers for whichever of the two 
+	// Subscribe handlers for whichever of the two IPS methods is active
     n.subscribe("/indoor_pos", 1, pose_callback_live);
     n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
 
