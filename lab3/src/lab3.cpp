@@ -142,6 +142,54 @@ void map_callback(const nav_msgs::OccupancyGrid msg)
     og = msg;
 }
 
+void drawPrm(tuple<vector<coord>, map<int, map<int, double>>> prmResult) {
+	// Plot the points
+	int pointId = 0;
+    vector<coord> coords = std::get<0>(prmResult);
+    int num_nodes=coords.size();
+    std::cout<<num_nodes<<std::endl;
+    for (int i=0; i<num_nodes; ++i)
+    {
+        coord item = coords[i]; 
+        double x = std::get<0>(item); 
+        double y = std::get<1>(item);
+        std::cout<<"X-val"<<x<<" Y-val"<<y<<std::endl;
+        geometry_msgs::Point p;
+        p.x = x;
+        p.y = y;
+        drawPoint(pointId++, p);
+        //std::cin.get();
+    }
+	
+	// Plot the edges
+    map<int, map<int, double>> edges = std::get<1>(prmResult);
+    int num_edges = edges.size();
+    std::cout<<num_edges<<std::endl;
+    for (auto kv1: edges)
+    {
+        int idx1 = kv1.first;
+        coord c1 = coords[idx1];
+        map<int, double> connections = kv1.second;
+
+	std::cout << "num connections: " << connections.size() << std::endl;
+        for(auto kv2: connections) {
+            geometry_msgs::Point start_, end_;
+
+            int idx2 = kv2.first;
+            coord c2 = coords[idx2];
+            
+            // Get start and end coordinates
+            start_.x = std::get<0>(c1);
+            start_.y = std::get<1>(c1);    
+            end_.x = std::get<0>(c2);
+            end_.y = std::get<1>(c2);
+            
+            // Draw line between c1 and c2
+            drawLineSegment(pointId++, start_, end_);
+        }
+    } 
+}
+
 
 int main(int argc, char **argv)
 {
@@ -151,7 +199,7 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
     
     auto map_sub = n.subscribe("/map", 1, map_callback);
-    //ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback); //switch for live tests
+    auto pose_sub_live = n.subscribe("/indoor_pos", 1, pose_callback); //switch for live tests
     auto pose_sub_sim = n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
     auto velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
     marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 20);
@@ -176,63 +224,17 @@ int main(int argc, char **argv)
 
 	do {
 		attempt++;
+        success = true;
 		std::cout << "Attempt " << attempt << ": " << std::endl;
 		result = prm(m, 6, coord{IPS[0],IPS[1]}, waypoints, grid);
-		
+		drawPrm(result);
+        std::cin.get();
+        
 		for (auto wp: vector<int>{1, 2, 3}) {
 			success = success && a_star(0, wp, std::get<0>(result), std::get<1>(result)).size() > 0;
 		}
 	} while (!success);
     ROS_INFO("Obtained the PRM");
-	
-	// Plot the points
-	int pointId = 0;
-    vector<coord> coords = std::get<0>(result);
-    int num_nodes=coords.size();
-    std::cout<<num_nodes<<std::endl;
-    for (int i=0; i<num_nodes; ++i)
-    {
-        coord item = coords[i]; 
-        double x = std::get<0>(item); 
-        double y = std::get<1>(item);
-        std::cout<<"X-val"<<x<<" Y-val"<<y<<std::endl;
-        geometry_msgs::Point p;
-        p.x = x;
-        p.y = y;
-        drawPoint(pointId++, p);
-        //std::cin.get();
-    }
-	
-	// Plot the edges
-    map<int, map<int, double>> edges = std::get<1>(result);
-    int num_edges = edges.size();
-    std::cout<<num_edges<<std::endl;
-    for (auto kv1: edges)
-    {
-        int idx1 = kv1.first;
-        coord c1 = coords[idx1];
-        map<int, double> connections = kv1.second;
-
-	std::cout << "num connections: " << connections.size() << std::endl;
-        for(auto kv2: connections) {
-            geometry_msgs::Point start_, end_;
-
-            int idx2 = kv2.first;
-            coord c2 = coords[idx2];
-            
-            // Get start and end coordinates
-            start_.x = std::get<0>(c1);
-            start_.y = std::get<1>(c1);    
-            end_.x = std::get<0>(c2);
-            end_.y = std::get<1>(c2);
-            
-            // Draw line between c1 and c2
-            //lines.points.push_back(start_);
-            //lines.points.push_back(end_);
-            std::cin.get();
-            drawLineSegment(pointId++, start_, end_);
-        }
-    }    
 
     while (ros::ok())
     {
