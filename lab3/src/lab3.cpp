@@ -33,6 +33,14 @@ Eigen::Vector3d IPS;
 int m = 10;
 nav_msgs::OccupancyGrid og;
 
+double ipsYaw, ipsX, ipsY;
+
+//controller global variables
+vector<double> previousErrorYaw;
+double kp = 0.5;
+double ki = 0;
+double kd = 0;
+
 //Callback function for the Position topic (LIVE)
 
 void pose_callback_live(const geometry_msgs::PoseWithCovarianceStamped & msg)
@@ -58,7 +66,48 @@ void pose_callback_sim(const gazebo_msgs::ModelStates& msg)
     IPS << msg.pose[i].position.x ,msg.pose[i].position.y ,tf::getYaw(msg.pose[i].orientation);
     ROS_INFO("pose_callback X: %f Y: %f Yaw: %f", IPS[0], IPS[1], IPS[2]);
 }
-    
+
+double constrainAngle(double x){
+    x = fmod(x,2*M_PI);
+    if (x < 0)
+        x += 2*M_PI;
+    return x;
+}
+
+//yaw PID controller
+double yawController(double currentYaw, double targetX, double targetY, double ipsX, double ipsY){
+
+  //opposite over adjacent distance is angle to destination
+  double targetYaw = atan2((targetY - ipsY),(targetX - ipsX));
+
+  targetYaw = targetYaw;
+
+  cout << "targetYaw: " << targetYaw << endl;
+
+  //error feedback for yaw
+  double errorInYaw = targetYaw - currentYaw;
+  
+  cout << "errorYaw: " << errorInYaw << endl;
+ 
+  //change in error for derivative
+  //double changeInErrorYaw = errorInYaw - previousErrorYaw.back();
+  double changeInErrorYaw = 0;
+  //record new error
+  previousErrorYaw.push_back(errorInYaw);
+
+  //total error over time for integral
+  double totalErrorYaw = 0;
+
+  for(int i = 0; i < previousErrorYaw.size(); i++){
+      totalErrorYaw += previousErrorYaw[i];
+  }
+
+  //new output yaw
+  double outputYaw = kp*errorInYaw + ki*totalErrorYaw + kd*changeInErrorYaw;
+  return outputYaw;
+
+}
+
 void drawPoint(int k, geometry_msgs::Point p) 
 {
     visualization_msgs::Marker points; //Define points
