@@ -168,6 +168,7 @@ vector<int> a_star(int start, int end, vector<coord> milestones, edgeset edges) 
                 result.push_back(trajectory[result.back()]);
             }
             
+            reverse(result.begin(), result.end());
             return result;
         }
         
