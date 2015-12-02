@@ -154,7 +154,7 @@ int main(int argc, char **argv)
     //ros::Subscriber pose_sub = n.subscribe("/indoor_pos", 1, pose_callback); //switch for live tests
     auto pose_sub_sim = n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
     auto velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
-    auto marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 20);
+    marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 20);
     
     //Velocity control variable
     geometry_msgs::Twist vel;
@@ -170,11 +170,11 @@ int main(int argc, char **argv)
 	
 	// Get the probabilistic roadmap
     ROS_INFO("Attempting to get PRM");
-	bool success = false;
+	bool success = true;
 	int attempt = 0;
 	tuple<vector<coord>, map<int, map<int, double>>> result;
 
-	while (!success) {
+	do {
 		attempt++;
 		std::cout << "Attempt " << attempt << ": " << std::endl;
 		result = prm(m, 6, coord{IPS[0],IPS[1]}, waypoints, grid);
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
 		for (auto wp: vector<int>{1, 2, 3}) {
 			success = success && a_star(0, wp, std::get<0>(result), std::get<1>(result)).size() > 0;
 		}
-	}
+	} while (!success);
     ROS_INFO("Obtained the PRM");
 	
 	// Plot the points
@@ -200,7 +200,6 @@ int main(int argc, char **argv)
         p.x = x;
         p.y = y;
         drawPoint(pointId++, p);
-        //marker_pub.publish(points);
         //std::cin.get();
     }
 	
@@ -230,7 +229,7 @@ int main(int argc, char **argv)
             // Draw line between c1 and c2
             //lines.points.push_back(start_);
             //lines.points.push_back(end_);
-            
+            std::cin.get();
             drawLineSegment(pointId++, start_, end_);
         }
     }    
