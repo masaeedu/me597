@@ -95,12 +95,6 @@ indices get_indices(coord c, nav_msgs::OccupancyGrid grid) {
     };
 }
 
-bool is_connection_valid(coord start, coord finish, nav_msgs::OccupancyGrid grid) {
-    return true;
-    // auto idx1 = bresenham(get_indices(start, grid))
-}
-
-
 coord get_coordinates(indices i, nav_msgs::OccupancyGrid grid) {
     return coord {
         (0.5 + get<0>(i)) * grid.info.resolution + grid.info.origin.position.x, 
@@ -112,6 +106,21 @@ int get_og_index(indices idx, nav_msgs::OccupancyGrid grid) {
     auto x = get<0>(idx);
     auto y = get<1>(idx);
     return y * grid.info.width + x;
+}
+
+bool is_connection_valid(coord start, coord finish, nav_msgs::OccupancyGrid grid) {
+    vector<int> x;
+    vector<int> y;
+    bresenham(get_indices(start, grid), get_indices(finish, grid), x, y);
+    
+    for (auto i = x.begin(); i != x.end(); i++ ) {
+        int idx = get_og_index(coord {*i, y[i - x.begin()]}, grid);
+        
+        if (grid.data[idx] >= 10) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool is_milestone_valid(coord ms, nav_msgs::OccupancyGrid grid) {
