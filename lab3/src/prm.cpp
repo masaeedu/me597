@@ -6,7 +6,14 @@ typedef tuple<int, int> indices;
 typedef tuple<double, double> coord;
 map<int, map<int, double>> edgeset;
 
-vector<coord> prm(int n, int k, coord start, vector<coord> targets, gazebo_msgs::OccupancyGrid grid) {	
+int main() {
+	// Indices of targets (the last n-1 items of the n items in milestones are the targets)
+	vector<int> ti(targets.size());
+	iota(ti.start(), ti.end(), 1);
+}
+
+
+tuple<vector<coord>, edgeset> prm(int n, int k, coord start, vector<coord> targets, gazebo_msgs::OccupancyGrid grid) {	
 	// Figure out map width and height
 	double mapWidth = grid.info.resolution * grid.info.width;
 	double mapHeight = grid.info.resolution * grid.info.height;
@@ -18,10 +25,6 @@ vector<coord> prm(int n, int k, coord start, vector<coord> targets, gazebo_msgs:
 	// Seed graph with start node and targets
 	milestones.push_back(start);
 	milestones.insert(milestones.end(), targets.start(), targets.end());
-	
-	// Indices of targets
-	vector<int> ti(targets.size());
-	iota(ti.start(), ti.end(), 1);
 	
 	// Sample a collision-free set of milestones
 	while (milestones.size() < n) {
@@ -36,21 +39,14 @@ vector<coord> prm(int n, int k, coord start, vector<coord> targets, gazebo_msgs:
 	
 	// For each milestone, connect all legal paths
 	for (auto i: milestones) {
-		auto neighbors = find_nearest_neighbors(i, milestones, k);
-		for (auto j: neighbors) {
+		for (auto j: find_nearest_neighbors(i, milestones, k)) {
 			if (is_connection_valid(milestones[i], milestones[j], grid)) {
 				edges[i][j] = get_distance(milestones[i], milestones[j]);
 			}
 		}
 	}
 	
-	// If graph is connected, yay!
-	try {
-		
-	}
-	
-	// If graph is not connected, shit pants.
-	
+	return {milestones, edges};
 }
 
 vector<int> a_star(int start, int end, vector<coord> milestones, edgeset edges) {
@@ -75,13 +71,57 @@ vector<int> a_star(int start, int end, vector<coord> milestones, edgeset edges) 
 		int current;
 		double lowest = numeric_limits<double>::infinity();
 		
+		// Choose the node from the open set with the lowest lower-bound estimate of cost
 		for (auto i: open) {
 			if (cost_lower_bound[i] < lowest) {
 				lowest = cost_lower_bound[i];
 				current = i;
 			}
 		}
+		
+		// If we've already reached the goal, walk backwards along the trajectory 
+		// to construct a vector of node indices and return it
+		if (current == end) {
+			vector<int> result;
+			result.push_back(end);
+			
+			while (trajectory.count(result.back())) {
+				result.push_back(trajectory[result.back()]);
+			}
+			
+			return result;
+		}
+		
+		// Remove current from open set and add to closed set
+		open.remove(current);
+		closed.insert(current);
+		
+		// Deal with neighbors of current cell
+		for (auto kv: edges[current]) {
+			auto neighbor = kv.first;
+			auto distance = kv.second;
+			
+			// Ignore any neighbors which have already been evaluated
+			if (closed.count(neighbor)) {
+				continue;
+			}
+			
+			// Insert the neighbor in the open set and work out total cost from start node
+			open.insert(neighbor);
+			auto cost = cost_actual[current] + distance;
+			
+			// If this is a newly visited node or previous visits were through suboptimal path,
+			// update metrics
+			if (!trajectory.count(neighbor) || cost < cost_actual[neighbor]) {
+				trajectory[neighbor] = current;
+				cost_actual[neighbor] = cost;
+				cost_lower_bound[neighbor] = cost + get_distance(milestones[neighbor], endpoint);
+			}
+		}
 	}
+	
+	// If we haven't returned by this point, there is no path
+	return {};
 }
 
 vector<int> find_nearest_neighbors(coord point, vector<coord> candidates, int k) {
