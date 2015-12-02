@@ -190,7 +190,7 @@ Marker build_particleset_viz(Matrix<double, k, m> pset) {
     auto mean = pset.rowwise().mean();
     
     msg.id = 0;
-    msg.header.frame_id = "map";
+    msg.header.frame_id = "world";
     msg.header.stamp = ros::Time();
     msg.ns = "localization";
     msg.action = Marker::ADD;

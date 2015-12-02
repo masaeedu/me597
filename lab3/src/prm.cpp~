@@ -72,6 +72,9 @@ vector<int> find_nearest_neighbors(coord point, vector<coord> candidates, int k)
         return get_distance(point, candidates[a]) < get_distance(point, candidates[b]);
     });
 
+    for (auto i: idx) { cout << i << endl; }
+    cin.get();
+
     return vector<int>(idx.begin() + 1, idx.begin() + k);
 }
 
