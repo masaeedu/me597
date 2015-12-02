@@ -166,11 +166,11 @@ int main(int argc, char **argv)
     auto grid = *ros::topic::waitForMessage<nav_msgs::OccupancyGrid>("/map", n, ros::Duration(1.0));
 	
 	// Waypoints we need to hit
-	auto waypoints = vector<coord>{coord{4.0,0.0},coord{8.0,-4.0},coord{8.0,0.0}};waypoints
+	auto waypoints = vector<coord>{coord{4.0,0.0},coord{8.0,-4.0},coord{8.0,0.0}};
 	
 	// Get the probabilistic roadmap
     ROS_INFO("Attempting to get PRM");
-	bool success = false
+	bool success = false;
 	int attempt = 0;
 	tuple<vector<coord>, map<int, map<int, double>>> result;
 
@@ -179,7 +179,7 @@ int main(int argc, char **argv)
 		std::cout << "Attempt " << attempt << ": " << std::endl;
 		result = prm(m, 6, coord{IPS[0],IPS[1]}, waypoints, grid);
 		
-		for (auto wp: vector{1, 2, 3}) {
+		for (auto wp: vector<int>{1, 2, 3}) {
 			success = success && a_star(0, wp, std::get<0>(result), std::get<1>(result)).size() > 0;
 		}
 	}
@@ -200,7 +200,7 @@ int main(int argc, char **argv)
         p.x = x;
         p.y = y;
         drawPoint(pointId++, p);
-        marker_pub.publish(points);
+        //marker_pub.publish(points);
         //std::cin.get();
     }
 	
@@ -214,7 +214,7 @@ int main(int argc, char **argv)
         coord c1 = coords[idx1];
         map<int, double> connections = kv1.second;
 
-		std::cout << "num connections: " << connections.size() << std::endl;
+	std::cout << "num connections: " << connections.size() << std::endl;
         for(auto kv2: connections) {
             geometry_msgs::Point start_, end_;
 
@@ -228,8 +228,8 @@ int main(int argc, char **argv)
             end_.y = std::get<1>(c2);
             
             // Draw line between c1 and c2
-            lines.points.push_back(start_);
-            lines.points.push_back(end_);
+            //lines.points.push_back(start_);
+            //lines.points.push_back(end_);
             
             drawLineSegment(pointId++, start_, end_);
         }
