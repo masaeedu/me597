@@ -8,7 +8,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  tf
 )
+
+set(CMAKE_CXX_FLAGS "-std=c++11")
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -128,16 +131,16 @@ include_directories(
 # add_dependencies(lab3 ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-# add_executable(lab3_node src/lab3_node.cpp)
+ add_executable(lab3 src/lab3.cpp)
+ add_executable(assn_localization src/assn_localization.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(lab3_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(lab3 ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(lab3_node
-#   ${catkin_LIBRARIES}
-# )
+ target_link_libraries(lab3 ${catkin_LIBRARIES})
+ target_link_libraries(assn_localization ${catkin_LIBRARIES})
 
 #############
 ## Install ##

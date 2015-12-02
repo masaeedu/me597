@@ -190,7 +190,7 @@ Marker build_particleset_viz(Matrix<double, k, m> pset) {
     auto mean = pset.rowwise().mean();
     
     msg.id = 0;
-    msg.header.frame_id = "world";
+    msg.header.frame_id = "map";
     msg.header.stamp = ros::Time();
     msg.ns = "localization";
     msg.action = Marker::ADD;
@@ -228,7 +228,7 @@ void publish_world_robot_transform(double x, double y, double omega){
     q.setEuler(omega, 0, 0);
     transform.setRotation(q);
     
-    br.sendTransform(tf::StampedTransform(transform, ros::Time(), "world", "base_link"));
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "base_link"));
 }
 
 int main(int argc, char **argv)
@@ -248,15 +248,15 @@ int main(int argc, char **argv)
         belief.col(i) << (drand() - 0.5) * 2 * 10, (drand() - 0.5) * 2 * 10, (drand() - 0.5) * 2 * M_PI;
     }
     
-    // Publisher for belief particle set (queue size 0, don't really need msgs to queue up)
-    auto particles_pub = n.advertise<Marker>("visualization_marker", 1, true);    
+    // Publisher for belief particle set
+    auto particles_pub = n.advertise<Marker>("belief_set", 1, true);    
     
-    // Subscribers for odometry and IPS updates
-    auto odo_sub = n.subscribe("/odom", 1, odom_callback);
+    // Subscribers for odometry
+    auto odom_sub = n.subscribe("/odom", 1, odom_callback);
 	
-	// Subscribe handlers for whichever of the two 
-    n.subscribe("/indoor_pos", 1, pose_callback_live);
-    n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
+	// Subscribe handlers for whichever of the two IPS methods is active
+    auto pose_sub_live = n.subscribe("/indoor_pos", 1, pose_callback_live);
+    auto pose_sub_sim = n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
 
     // Set the loop rate
     ros::Rate loop_rate(1 / dt);
