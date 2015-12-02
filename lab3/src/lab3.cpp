@@ -199,7 +199,7 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
     
     auto map_sub = n.subscribe("/map", 1, map_callback);
-    auto pose_sub_live = n.subscribe("/indoor_pos", 1, pose_callback); //switch for live tests
+    auto pose_sub_live = n.subscribe("/indoor_pos", 1, pose_callback_live); //switch for live tests
     auto pose_sub_sim = n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
     auto velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
     marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 20);
