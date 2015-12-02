@@ -269,24 +269,56 @@ int main(int argc, char **argv)
 	bool success = true;
 	int attempt = 0;
 	tuple<vector<coord>, map<int, map<int, double>>> result;
-
+	vector<int> path_nodes;
 	do {
 		attempt++;
-        success = true;
+        	success = true;
+		path_nodes = {};
 		std::cout << "Attempt " << attempt << ": " << std::endl;
 		result = prm(m, 6, coord{IPS[0],IPS[1]}, waypoints, grid);
 		drawPrm(result);
-        std::cin.get();
+        	std::cin.get();
         
 		for (auto wp: vector<int>{1, 2, 3}) {
-			success = success && a_star(0, wp, std::get<0>(result), std::get<1>(result)).size() > 0;
+			auto path_seg = a_star(wp - 1, wp, std::get<0>(result), std::get<1>(result));
+			success = success && path_seg.size() > 0;
+			path_nodes.insert(path_nodes.end(),path_seg.begin(),path_seg.end());
 		}
 	} while (!success);
     ROS_INFO("Obtained the PRM");
+    vector<coord> coords = std::get<0>(result);
+    bool outsideXThreshold, outsideYThreshold;
+    outsideXThreshold = outsideYThreshold = true;
 
-    while (ros::ok())
-    {
-        loop_rate.sleep(); //Maintain the loop rate
-        ros::spinOnce();   //Check for new messages
-    }
+	//bool outsideYawThreshold = true;
+	     while(int i < path_nodes.size() && ros::ok()){
+
+		loop_rate.sleep(); //Maintain the loop rate
+        	ros::spinOnce();   //Check for new messages
+
+		coord target = coords[path_nodes[i]];
+
+		//check if within error bound of x waypoint
+		outsideXThreshold = abs(std::get<0>(target) - ipsX) < 0.15;
+		
+		//check if within error bounds of y waypoint
+		outsideYThreshold = abs(std::get<1>(target)  - ipsY) < 0.15;
+
+	    	if(outsideXThreshold || outsideYThreshold){
+		    //if not, move towards destination
+		    vel.linear.x = 0.1;
+		    //update angular velocity using PID controller
+		    vel.angular.z = yawController(ipsYaw,std::get<0>(target),std::get<1>(target),ipsX,ipsY);
+		}
+		else{
+		    //if within error bounds, stop moving
+		    vel.linear.x = 0;
+		    vel.angular.z = 0;
+		    i ++;
+		}
+	      
+		cout << "ipsX: " << ipsX <<  " ipsY: " << ipsY << " ipsYaw: " << ipsYaw << endl;
+		cout << "Outside X: " << outsideXThreshold << " Outside Y: " << outsideYThreshold << endl;
+		velocity_publisher.publish(vel);
+	    }
 }
