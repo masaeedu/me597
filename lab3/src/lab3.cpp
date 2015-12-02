@@ -29,7 +29,7 @@ typedef tuple<double, double> coord;
 
 ros::Publisher marker_pub;
 Eigen::Vector3d IPS;
-int m = 10;
+int m = 100;
 Eigen::MatrixXd PRM_x_y(2,m);
 nav_msgs::OccupancyGrid og;
 
@@ -160,21 +160,14 @@ int main(int argc, char **argv)
 
 	geometry_msgs::Point start_, end_;
 	PRMpoints();
-
-	visualization_msgs::Marker points, lines; //Define points
-	lines.header.frame_id = points.header.frame_id = "/map";
-	lines.scale.x = 0.1;
-	lines.color.r = 1.0;
-	lines.color.b = 0.2;
-	lines.color.a = 1.0;
+	visualization_msgs::Marker points; //Define points
+	points.header.frame_id = "/map";
 	points.header.stamp = ros::Time::now();
-	lines.ns = points.ns = "lab3";
-	lines.action = points.action=visualization_msgs::Marker::ADD;
+	points.ns = "lab3";
+	points.action=visualization_msgs::Marker::ADD;
 	points.pose.orientation.w=1.0;
 	points.id=0;
-	lines.id=1;
 	points.type=visualization_msgs::Marker::POINTS;
-	lines.type = visualization_msgs::Marker::LINE_STRIP;
 	points.scale.x = 0.2;
 	points.scale.y = 0.2;
 	points.color.b = 1.0f;
@@ -182,7 +175,7 @@ int main(int argc, char **argv)
 	auto grid = *ros::topic::waitForMessage<nav_msgs::OccupancyGrid>("/map", n, ros::Duration(1.0));
 	ROS_INFO("Before the PRM");
 	std::cout << grid.info.resolution << endl;
-	auto result = prm(m, 3, coord{IPS[0],IPS[1]}, vector<coord>{coord{4.0,0.0},coord{8.0,-4.0},coord{8.0,0.0}}, grid);
+	auto result = prm(m, 6, coord{IPS[0],IPS[1]}, vector<coord>{coord{4.0,0.0},coord{8.0,-4.0},coord{8.0,0.0}}, grid);
 
 	vector<coord> coords = std::get<0>(result);
 	int num_nodes=coords.size();
@@ -203,32 +196,42 @@ int main(int argc, char **argv)
 	map<int, map<int, double>> edges = std::get<1>(result);
 	int num_edges = edges.size();
 	std::cout<<num_edges<<std::endl;
-	int j=0;
+	int j=1;
 	for (auto kv1: edges)
 	{
-		geometry_msgs::Point start_, end_;
 		int idx1 = kv1.first;
 		coord c1 = coords[idx1];
-		start_.x = std::get<0>(c1);
-		start_.y = std::get<1>(c1);
 		map<int, double> connections = kv1.second;
 
                 std::cout << "num connections: " << connections.size() << std::endl;
 		for(auto kv2: connections) {
-
+			visualization_msgs::Marker lines;
+			lines.header.frame_id = "/map";
+			lines.scale.x = 0.1;
+			lines.color.r = 1.0;
+			lines.color.b = 0.2;
+			lines.color.a = 1.0;
+			lines.ns = "lab3";
+			lines.action = visualization_msgs::Marker::ADD;
+			lines.id =j;
+			lines.type = visualization_msgs::Marker::LINE_STRIP;
+			geometry_msgs::Point start_, end_;
 			std::cin.get();
 			int idx2 = kv2.first;
-			coord c2 = coords[idx2];	
+			coord c2 = coords[idx2];
+			start_.x = std::get<0>(c1);
+			start_.y = std::get<1>(c1);	
 			end_.x = std::get<0>(c2);
 			end_.y = std::get<1>(c2);
 			// Draw line between c1 and c2
 			lines.points.push_back(start_);
 			lines.points.push_back(end_);
-			//drawLineSegment(j, start_, end_);
-			j++;
 			marker_pub.publish(lines);
+			//std::cin.get();
+			j++;
 		}
 	}
+
 	//coord item = coords[0]; 
 	//double x = std::get<0>(item); 
 	//double y = std::get<1>(item);
