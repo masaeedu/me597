@@ -27,8 +27,7 @@ typedef tuple<double, double> coord;
 
 #define TAGID 0
 
-ros::Publisher miles_pub;
-ros::Publisher edges_pub;
+ros::Publisher marker_pub;
 Eigen::Vector3d IPS;
 int m = 100;
 nav_msgs::OccupancyGrid og;
@@ -99,46 +98,6 @@ double yawController(double currentYaw, double targetX, double targetY,
     return outputYaw;
 }
 
-void drawPoint(int k, geometry_msgs::Point p)
-{
-    visualization_msgs::Marker points; // Define points
-    points.header.frame_id = "/map";
-    points.header.stamp = ros::Time::now();
-    points.ns = "lab3";
-    points.type = visualization_msgs::Marker::POINTS;
-    points.action = visualization_msgs::Marker::ADD;
-    points.pose.orientation.w = 1.0;
-    points.id = k;
-    points.scale.x = 0.2;
-    points.scale.y = 0.2;
-    points.color.b = 1.0;
-    points.color.a = 1.0;
-
-    points.points.push_back(p);
-
-    miles_pub.publish(points);
-}
-
-void drawLineSegment(int k, geometry_msgs::Point start_point,
-    geometry_msgs::Point end_point)
-{
-    visualization_msgs::Marker lines;
-    lines.header.frame_id = "/map";
-    lines.type = visualization_msgs::Marker::LINE_STRIP;
-    lines.action = visualization_msgs::Marker::ADD;
-    lines.ns = "lab3";
-    lines.id = k; // each curve must have a unique id or you will overwrite an old ones
-    lines.scale.x = 0.1;
-    lines.color.r = 1.0;
-    lines.color.b = 0.2;
-    lines.color.a = 1.0;
-
-    lines.points.push_back(start_point);
-    lines.points.push_back(end_point);
-
-    // publish new segment line
-    edges_pub.publish(lines);
-}
 
 // Callback function for the map
 void map_callback(const nav_msgs::OccupancyGrid msg)
@@ -147,47 +106,126 @@ void map_callback(const nav_msgs::OccupancyGrid msg)
     og = msg;
 }
 
-void drawPrm(tuple<vector<coord>, map<int, map<int, double> > > prmResult)
+void drawPoint(int k, geometry_msgs::Point p) 
 {
-    // Plot the points
-    int pointId = 0;
-    vector<coord> coords = std::get<0>(prmResult);
-    int num_nodes = coords.size();
-    for (int i = 0; i < num_nodes; ++i) {
-        coord item = coords[i];
-        double x = std::get<0>(item);
-        double y = std::get<1>(item);
-        geometry_msgs::Point p;
-        p.x = x;
-        p.y = y;
-        drawPoint(pointId++, p);
-    }
+	visualization_msgs::Marker points; //Define points
+	points.header.frame_id = "/map";
+	points.header.stamp = ros::Time::now();
+	points.ns = "lab3";
+	points.action = visualization_msgs::Marker::ADD;
+	points.pose.orientation.w = 1.0;
+	points.id = k;
+	points.type = visualization_msgs::Marker::POINTS;
+	points.scale.x = 0.2;
+	points.scale.y = 0.2;
+	points.color.b = 1.0f;
+	points.color.a = 1.0;
+	points.points.push_back(p); //just changed this
 
-    // Plot the edges
-    map<int, map<int, double> > edges = std::get<1>(prmResult);
-    int num_edges = edges.size();
-    for (auto kv1 : edges) {
-        int idx1 = kv1.first;
-        coord c1 = coords[idx1];
-        map<int, double> connections = kv1.second;
-
-        for (auto kv2 : connections) {
-            geometry_msgs::Point start_, end_;
-
-            int idx2 = kv2.first;
-            coord c2 = coords[idx2];
-
-            // Get start and end coordinates
-            start_.x = std::get<0>(c1);
-            start_.y = std::get<1>(c1);
-            end_.x = std::get<0>(c2);
-            end_.y = std::get<1>(c2);
-
-            // Draw line between c1 and c2
-            drawLineSegment(pointId++, start_, end_);
-        }
-    }
+	usleep(2000);
+	//std::cin.get();
+	marker_pub.publish(points);
 }
+
+void drawLineSegment(int k, geometry_msgs::Point start_point, geometry_msgs::Point end_point)
+{
+	visualization_msgs::Marker lines;
+	lines.header.frame_id = "/map";
+	lines.type = visualization_msgs::Marker::LINE_STRIP;
+	lines.ns = "lab3";
+	
+	
+	lines.id = k; //each curve must have a unique id or you will overwrite an old ones
+	lines.type = visualization_msgs::Marker::LINE_STRIP;
+	lines.action = visualization_msgs::Marker::ADD;
+	
+	lines.scale.x = 0.1;
+	lines.color.r = 1.0;
+	lines.color.b = 0.2;
+	lines.color.a = 1.0;
+
+	lines.points.push_back(start_point);
+	lines.points.push_back(end_point);
+
+	//publish new segment line
+	usleep(2000);
+	marker_pub.publish(lines);
+	//sleep(0.05);
+}
+
+void delLine(int k)
+{
+	visualization_msgs::Marker lines;
+	lines.header.frame_id = "/map";
+	lines.id = k;
+	lines.ns = "lab3";
+	lines.action = visualization_msgs::Marker::DELETE;
+
+	//publish new segment line
+	usleep(2000);
+	marker_pub.publish(lines);
+}
+
+void drawPrm(tuple<vector<coord>, map<int, map<int, double>>> prmResult) {
+	// Plot the points
+	int pointId = 0;
+	vector<coord> coords = std::get<0>(prmResult);
+	int num_nodes=coords.size();
+	std::cout<<num_nodes<<std::endl;
+
+	for (int i=0; i<m*7; i++)
+	{
+		usleep(2000);
+		delLine(i);
+	}
+
+	for (int i=0; i<num_nodes; ++i)
+	{
+	        coord item = coords[i]; 
+	        double x = std::get<0>(item); 
+	        double y = std::get<1>(item);
+	        std::cout<<"X-val"<<x<<" Y-val"<<y<<std::endl;
+	        geometry_msgs::Point p;
+	        p.x = x;
+	        p.y = y;
+		
+		usleep(2000);
+	        drawPoint(pointId++, p);
+	        //std::cin.get();
+	}
+	
+	// Plot the edges
+	map<int, map<int, double>> edges = std::get<1>(prmResult);
+	int num_edges = edges.size();
+	std::cout<<num_edges<<std::endl;
+
+	for (auto kv1: edges)
+	{
+		int idx1 = kv1.first;
+		coord c1 = coords[idx1];
+		map<int, double> connections = kv1.second;
+
+		std::cout << "num connections: " << connections.size() << std::endl;
+		for(auto kv2: connections) 
+		{
+			geometry_msgs::Point start_, end_;
+	       		int idx2 = kv2.first;
+        		coord c2 = coords[idx2];
+            
+        		// Get start and end coordinates
+        		start_.x = std::get<0>(c1);
+        		start_.y = std::get<1>(c1);    
+        		end_.x = std::get<0>(c2);
+        		end_.y = std::get<1>(c2);
+            
+        		// Draw line between c1 and c2
+			usleep(800);
+        		drawLineSegment(pointId++, start_, end_);
+		
+		}
+	} 
+}
+
 
 int main(int argc, char** argv)
 {
@@ -200,9 +238,7 @@ int main(int argc, char** argv)
         pose_callback_live); // switch for live tests
     auto pose_sub_sim = n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
     auto velocity_publisher = n.advertise<geometry_msgs::Twist>("/cmd_vel_mux/input/navi", 1);
-    miles_pub = n.advertise<visualization_msgs::Marker>("milestones", 0);
-    edges_pub = n.advertise<visualization_msgs::Marker>("edges", 0);
-
+    marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 20);
     // Velocity control variable
     geometry_msgs::Twist vel;
 
