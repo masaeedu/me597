@@ -108,6 +108,34 @@ int get_og_index(indices idx, nav_msgs::OccupancyGrid grid) {
     return y * grid.info.width + x;
 }
 
+vector<indices> get_radius_neighbors(indices idx, int width, int height, int radius) {
+    vector<indices> result;
+    for (int i = max(get<0>(idx) - radius, 0); i < min(get<0>(idx) + radius, width); i++) {
+        for (int j = max(get<1>(idx) - radius, 0); j < min(get<1>(idx) + radius, width); j++) {
+            result.push_back(indices{i, j});
+        }
+    }
+    
+    return result;
+}
+
+void fuck_up_occupancygrid(nav_msgs::OccupancyGrid &grid) {
+    for (int i = 0; i < grid.info.width; i++) {
+        for (int j = 0; j < grid.info.height; j++) {
+            auto idx = indices{i, j}; 
+            int flatIndex = get_og_index(idx, grid);
+            
+            if (grid.data[flatIndex] > 90) {
+                auto neighbors = get_radius_neighbors(idx, grid.info.width, grid.info.height, (int)(0.2 / grid.info.resolution));
+                
+                for (auto n: neighbors) {
+                    grid.data[get_og_index(n, grid)] = 80;
+                }
+            }
+        }
+    }
+}
+
 bool is_connection_valid(coord start, coord finish, nav_msgs::OccupancyGrid grid) {
     vector<int> x;
     vector<int> y;
@@ -124,8 +152,9 @@ bool is_connection_valid(coord start, coord finish, nav_msgs::OccupancyGrid grid
 }
 
 bool is_milestone_valid(coord ms, nav_msgs::OccupancyGrid grid) {
-    auto idx = get_og_index(get_indices(ms, grid), grid);
-    return grid.data[idx] < 10;
+    auto idx = get_indices(ms, grid);
+    
+    return grid.data[get_og_index(idx, grid)] < 10;
 }
 
 vector<int> a_star(int start, int end, vector<coord> milestones, edgeset edges) {
@@ -208,6 +237,9 @@ tuple<vector<coord>, edgeset> prm(const int n, const int k, coord start, vector<
     // Figure out map width and height
     double mapWidth = grid.info.resolution * grid.info.width;
     double mapHeight = grid.info.resolution * grid.info.height;
+    
+    // Inflating obstacle edges
+    fuck_up_occupancygrid(grid);
     
     // Start generating graph
     vector<coord> milestones;
