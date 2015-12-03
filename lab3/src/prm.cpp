@@ -111,7 +111,7 @@ int get_og_index(indices idx, nav_msgs::OccupancyGrid grid) {
 vector<indices> get_radius_neighbors(indices idx, int width, int height, int radius) {
     vector<indices> result;
     for (int i = max(get<0>(idx) - radius, 0); i < min(get<0>(idx) + radius, width); i++) {
-        for (int j = max(get<1>(idx) - radius, 0); j < min(get<1>(idx) + radius, width); j++) {
+        for (int j = max(get<1>(idx) - radius, 0); j < min(get<1>(idx) + radius, height); j++) {
             result.push_back(indices{i, j});
         }
     }
@@ -126,10 +126,10 @@ void fuck_up_occupancygrid(nav_msgs::OccupancyGrid &grid) {
             int flatIndex = get_og_index(idx, grid);
             
             if (grid.data[flatIndex] > 90) {
-                auto neighbors = get_radius_neighbors(idx, grid.info.width, grid.info.height, (int)(0.2 / grid.info.resolution));
+                auto neighbors = get_radius_neighbors(idx, grid.info.width, grid.info.height, (int)(0.4 / grid.info.resolution));
                 
                 for (auto n: neighbors) {
-                    grid.data[get_og_index(n, grid)] = 80;
+                    grid.data[get_og_index(n, grid)] = max(80, (int)grid.data[get_og_index(n, grid)]);
                 }
             }
         }
@@ -240,6 +240,14 @@ tuple<vector<coord>, edgeset> prm(const int n, const int k, coord start, vector<
     
     // Inflating obstacle edges
     fuck_up_occupancygrid(grid);
+    /* for (auto it = grid.data.begin(); it != grid.data.end(); it++) {
+        cout << (int)*it << "; ";
+        if (distance(grid.data.begin(), it) % grid.info.width == 0) {
+            cout << endl;
+        }
+    }
+    cout << endl;
+    cin.get(); */
     
     // Start generating graph
     vector<coord> milestones;
