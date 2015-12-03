@@ -10,6 +10,7 @@
 #include <nav_msgs/Path.h>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 #include <Eigen/Dense>
 #include <string>
@@ -160,7 +161,7 @@ void pose_callback_live(const geometry_msgs::PoseWithCovarianceStamped& msg) {
     auto lin = msg.pose.pose.position;
     auto yaw = tf::getYaw(msg.pose.pose.orientation);
     
-    z << lin.x, lin.y, yaw;
+    z << lin.x * 2.2, lin.y * 2.2, yaw;
 }
 
 // For gazebo "fake IPS" messages
@@ -180,7 +181,7 @@ void pose_callback_sim(const gazebo_msgs::ModelStates msg) {
 
 void odom_callback(const nav_msgs::Odometry msg) {
     odom.col(0) = odom.col(1);
-    odom.col(1) << msg.pose.pose.position.x, msg.pose.pose.position.y, tf::getYaw(msg.pose.pose.orientation);
+    odom.col(1) << msg.pose.pose.position.x, -msg.pose.pose.position.y, -tf::getYaw(msg.pose.pose.orientation);
 };
 
 template<int k, int m>
@@ -242,10 +243,11 @@ int main(int argc, char **argv)
          0,    0.01, 0,
          0,    0,    0.01;
     
-    // Initialize our belief (no clue where we are, just guess wildly)
+    // Initialize our belief about the origin of the map
+    auto grid = *ros::topic::waitForMessage<nav_msgs::OccupancyGrid>(
+        "/map", n, ros::Duration(1.0));
     for (int i = 0; i < m; i++) {
-        // Going for a 10m x 10m world
-        belief.col(i) << (drand() - 0.5) * 2 * 10, (drand() - 0.5) * 2 * 10, (drand() - 0.5) * 2 * M_PI;
+        belief.col(i) << (drand() - 0.5) * 2 * grid.info.width * grid.info.resolution, (drand() - 0.5) * 2 * grid.info.height * grid.info.resolution, (drand() - 0.5) * 2 * M_PI;
     }
     
     // Publisher for belief particle set
@@ -254,7 +256,7 @@ int main(int argc, char **argv)
     // Subscribers for odometry
     auto odom_sub = n.subscribe("/odom", 1, odom_callback);
 	
-	// Subscribe handlers for whichever of the two IPS methods is active
+    // Subscribe handlers for whichever of the two IPS methods is active
     auto pose_sub_live = n.subscribe("/indoor_pos", 1, pose_callback_live);
     auto pose_sub_sim = n.subscribe("/gazebo/model_states", 1, pose_callback_sim);
 
